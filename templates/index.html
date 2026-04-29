@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 상권 분석 의사결정 시스템</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="simple-container">
+        <main class="main-content-wide">
+            <!-- 1. Selection View (Map Selection) -->
+            <section id="view-selection">
+                <div class="simple-header">
+                    <h1>서울시 AI 상권 분석</h1>
+                    <p>지역을 선택하고 분석을 시작하세요.</p>
+                </div>
+
+                <div class="selection-container glass">
+                    <div class="map-box">
+                        <svg viewBox="40 0 760 660" class="seoul-svg">
+                            <g id="districts-group"></g>
+                        </svg>
+                    </div>
+                    <div class="options-box">
+                        <div class="input-group">
+                            <label>선택 지역</label>
+                            <div id="display-selected-name" class="selection-badge">지역을 선택해 주세요</div>
+                        </div>
+                        <button id="analyze-btn" class="primary-btn wide">상권 분석하기</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Result View (Dashboard) -->
+            <div id="view-results" class="hidden">
+                <div class="dashboard-layout">
+                    <!-- Sidebar Navigation -->
+                    <aside class="dashboard-sidebar">
+                        <div class="sidebar-header">
+                            <h2 style="color: var(--primary-color); font-weight: 800;">AI DASHBOARD</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 0.5rem; font-weight: 600;">서울시 상권 분석 시스템</p>
+                        </div>
+                        
+                        <nav class="sidebar-nav">
+                            <button class="nav-btn active" data-tab="tab-analysis">
+                                <span class="nav-icon">📊</span>
+                                <span class="nav-text">상권 분석 결과</span>
+                            </button>
+                            <button class="nav-btn" data-tab="tab-recommend">
+                                <span class="nav-icon">💡</span>
+                                <span class="nav-text">업종 추천 & 전략</span>
+                            </button>
+                            <button class="nav-btn" data-tab="tab-support">
+                                <span class="nav-icon">🤝</span>
+                                <span class="nav-text">창업 지원 정보</span>
+                            </button>
+                            <button class="nav-btn" data-tab="tab-mystore">
+                                <span class="nav-icon">🏠</span>
+                                <span class="nav-text">내 가게 분석</span>
+                            </button>
+                        </nav>
+
+                        <div class="sidebar-footer">
+                            <button id="back-to-map" class="nav-btn" style="width: 100%; background: rgba(0,0,0,0.03); color: var(--text-main);">
+                                <span class="nav-icon">🗺️</span>
+                                <span class="nav-text">지도로 돌아가기</span>
+                            </button>
+                        </div>
+                    </aside>
+
+                    <!-- Main Content Area -->
+                    <main class="dashboard-main">
+                        <header class="result-header" style="margin-bottom: 2rem;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div id="district-badge" class="badge" style="padding: 0.5rem 1rem; border-radius: 8px; font-size: 1rem;">-</div>
+                                <h1 id="res-title" style="margin: 0;">상권 분석 리포트</h1>
+                            </div>
+                        </header>
+
+                        <div id="final-summary-container" class="final-summary-box glass highlight" style="background: var(--primary-gradient); color: white; margin-bottom: 2rem;">
+                            <h3 style="color: white; margin-bottom: 0.5rem; font-size: 1.2rem;">📊 AI 최종 상권 진단</h3>
+                            <p id="res-final-summary" style="font-weight: 500; line-height: 1.6; white-space: pre-line;">데이터 분석 중...</p>
+                        </div>
+
+                        <!-- Tab 1: Analysis Content -->
+                        <div id="tab-analysis" class="tab-content active">
+                            <!-- Revenue Card -->
+                            <div class="main-result glass highlight" style="text-align: center; padding: 2.5rem; margin-bottom: 2rem;">
+                                <label style="font-size: 1rem; color: var(--text-dim); display: block; margin-bottom: 0.75rem;">점포당 예상 월 매출</label>
+                                <h2 id="res-sales" style="font-size: 3.5rem; margin-bottom: 0.5rem; color: var(--primary-color);">-</h2>
+                                <p id="res-sales-range" class="sub-text" style="font-size: 1.1rem; font-weight: 600;">-</p>
+                                
+                                <div class="revenue-chart-container" style="margin-top: 2.5rem; height: 150px;">
+                                    <canvas id="revenueRangeChart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Metrics Grid -->
+                            <div class="advanced-metrics-grid">
+                                <div class="metric-card glass">
+                                    <label>예상 월매출 등급</label>
+                                    <div class="metric-value-box"><span id="res-sales-grade" class="grade-badge">-</span></div>
+                                    <p class="metric-desc">전체 자치구 대비 수준</p>
+                                </div>
+                                <div class="metric-card glass">
+                                    <label>창업/운영 위험도</label>
+                                    <div class="metric-value-box">
+                                        <span id="res-risk-score" class="score-text">-</span>
+                                        <span class="unit">/ 100</span>
+                                    </div>
+                                    <div class="risk-bar-bg"><div id="res-risk-bar" class="risk-bar-fill" style="width: 0%"></div></div>
+                                </div>
+                                <div class="metric-card glass">
+                                    <label>경쟁강도 등급</label>
+                                    <div class="metric-value-box"><span id="res-comp-intensity" class="intensity-text">-</span></div>
+                                    <p class="metric-desc">점포 밀집도 기준</p>
+                                </div>
+                            </div>
+
+                            <!-- Comparison Summary -->
+                            <div class="comparison-summary-box glass highlight" style="margin: 2rem 0;">
+                                <h4 style="margin-bottom: 0.75rem; color: var(--primary-color); font-size: 0.95rem; font-weight: 800;">📍 지역 평균 대비 분석 요약</h4>
+                                <p id="res-comparison-text" class="comparison-text" style="font-weight: 600; font-size: 1.2rem; color: var(--text-main);">-</p>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                                <div id="decline-causes-container" class="decline-causes-section glass" style="border-left: 6px solid #f43f5e; padding: 1.5rem;">
+                                    <h3 style="color: #f43f5e; margin-bottom: 1.25rem; font-size: 1.15rem;">⚠️ 매출 하락 위험 요인</h3>
+                                    <div id="res-decline-causes" class="causes-list"></div>
+                                </div>
+
+                                <div id="strategies-container" class="strategies-section glass" style="border-left: 6px solid #10b981; padding: 1.5rem;">
+                                    <h3 style="color: #10b981; margin-bottom: 1.25rem; font-size: 1.15rem;">💡 AI 맞춤 운영 전략</h3>
+                                    <div id="res-strategies" class="strategies-list"></div>
+                                </div>
+                            </div>
+
+                            <div class="report-box glass" style="margin-bottom: 3rem;">
+                                <h3 style="margin-bottom: 1.5rem;">AI 전략 상세 제언</h3>
+                                <div id="res-report-content" class="report-text" style="font-size: 1.05rem;">데이터 분석 중...</div>
+                            </div>
+
+                            <!-- Simulation Section -->
+                            <div id="simulation-section" class="glass highlight" style="margin-top: 1rem; padding: 2.5rem; border-top: 4px solid var(--primary-color); border-radius: 24px;">
+                                <div style="margin-bottom: 2rem;">
+                                    <h3 style="margin-bottom: 0.5rem; color: var(--primary-color); font-size: 1.5rem;">🔍 수익 시뮬레이션</h3>
+                                    <p class="sub-text">목표 매출과 임대 정보를 입력하여 구체적인 수익성을 진단해 보세요.</p>
+                                </div>
+                                
+                                <div class="sim-split-layout" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 3rem; align-items: start;">
+                                    <div class="sim-input-area">
+                                        <div class="input-group" style="margin-bottom: 1.5rem;">
+                                            <label style="font-size: 0.9rem; color: var(--text-dim); font-weight: 700;">🎯 목표 월 매출 (만원)</label>
+                                            <input type="number" id="user-sales" placeholder="예: 3000">
+                                        </div>
+                                        <div class="input-group" style="margin-bottom: 1.5rem;">
+                                            <label style="font-size: 0.9rem; color: var(--text-dim); font-weight: 700;">🏠 임대 유형</label>
+                                            <select id="user-rent-type">
+                                                <option value="monthly">월세</option>
+                                                <option value="jeonse">전세</option>
+                                                <option value="owned">자가</option>
+                                            </select>
+                                        </div>
+                                        <div id="monthly-input" class="input-group" style="margin-bottom: 1.5rem;">
+                                            <label style="font-size: 0.9rem; color: var(--text-dim); font-weight: 700;">💵 월세액 (만원)</label>
+                                            <input type="number" id="user-rent" placeholder="예: 300">
+                                        </div>
+                                        <div id="jeonse-input" class="input-group" style="margin-bottom: 1.5rem; display: none;">
+                                            <label style="font-size: 0.9rem; color: var(--text-dim); font-weight: 700;">💰 보증금 (만원)</label>
+                                            <input type="number" id="user-deposit" placeholder="예: 50000">
+                                        </div>
+                                        <button id="re-analyze-btn" class="primary-btn wide" style="padding: 1.25rem; border-radius: 12px; font-weight: 800; font-size: 1.1rem; margin-top: 1rem;">시뮬레이션 실행</button>
+                                    </div>
+
+                                    <div class="sim-result-area" style="min-height: 380px;">
+                                        <div id="comparison-result-area" style="display: none;">
+                                            <div class="sim-res-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 2rem;">
+                                                <div class="ms-card glass" style="text-align: center; padding: 1.5rem;">
+                                                    <label style="font-size: 0.85rem; color: var(--text-dim); font-weight: 700;">목표 달성 여부</label>
+                                                    <div id="res-target-diff" style="font-size: 1.3rem; font-weight: 800; margin-top: 0.75rem; color: var(--primary-color);">-</div>
+                                                    <div id="res-target-status" style="font-size: 0.95rem; margin-top: 0.5rem; font-weight: 600;">-</div>
+                                                </div>
+                                                <div class="ms-card glass" style="text-align: center; padding: 1.5rem;">
+                                                    <label style="font-size: 0.85rem; color: var(--text-dim); font-weight: 700;">수익성 진단</label>
+                                                    <div id="res-profit-ratio" style="font-size: 1.3rem; font-weight: 800; margin-top: 0.75rem;">-</div>
+                                                    <div id="res-profit-status" style="font-size: 0.95rem; margin-top: 0.5rem; font-weight: 600;">-</div>
+                                                </div>
+                                            </div>
+                                            <div class="ms-card glass" style="padding: 1.5rem; margin-bottom: 2rem; border-left: 6px solid var(--primary-color); background: rgba(14, 165, 233, 0.03);">
+                                                <label style="font-size: 0.85rem; color: var(--primary-color); display: block; margin-bottom: 0.75rem; font-weight: 800;">📋 AI 종합 분석 의견</label>
+                                                <p id="res-final-comment" style="font-weight: 500; font-size: 1.05rem; line-height: 1.7; color: var(--text-main);">-</p>
+                                            </div>
+                                            <div class="ms-card glass" style="padding: 1.5rem;">
+                                                <label style="font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 1rem; font-weight: 700;">💬 지역 소셜/리뷰 키워드 요약</label>
+                                                <div id="sim-social-summary" style="display: flex; flex-wrap: wrap; gap: 0.75rem;"></div>
+                                            </div>
+                                        </div>
+                                        <div id="sim-placeholder" style="height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-dim); border: 2px dashed rgba(0,0,0,0.1); border-radius: 16px;">
+                                            좌측 정보를 입력하고 시뮬레이션을 실행하세요
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Mini Stats -->
+                            <div class="mini-stats" style="margin-top: 3rem; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                                <div class="stat-item glass" style="padding: 2rem; text-align: center;">
+                                    <label style="display: block; font-size: 1rem; color: var(--text-dim); margin-bottom: 0.5rem;">지역 점포 수</label>
+                                    <span id="res-stores" style="font-size: 2rem; font-weight: 800;">-</span>
+                                </div>
+                                <div class="stat-item glass" style="padding: 2rem; text-align: center;">
+                                    <label style="display: block; font-size: 1rem; color: var(--text-dim); margin-bottom: 0.5rem;">평균 임대료 (㎡당)</label>
+                                    <span id="res-rent" style="font-size: 2rem; font-weight: 800;">-</span>
+                                </div>
+                            </div>
+
+                            <div class="evidence-section" style="margin-top: 2rem;">
+                                <div class="chart-box glass" style="padding: 2rem;">
+                                    <h3 style="margin-bottom: 1.5rem;">📊 데이터 상관관계 (유동인구 vs 매출)</h3>
+                                    <div class="canvas-wrapper" style="height: 400px;"><canvas id="correlationChart"></canvas></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab 2: Recommendation -->
+                        <div id="tab-recommend" class="tab-content">
+                            <div class="recommend-section">
+                                <!-- NEW: 세부 위치 분석 보조 기능 -->
+                                <div class="location-assist-box glass" style="margin-bottom: 2rem; padding: 1.5rem; border: 1px solid var(--primary-color); border-radius: 16px;">
+                                    <h3 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--primary-color); display: flex; align-items: center; gap: 0.5rem;">
+                                        <span style="font-size: 1.2rem;">📍</span> 세부 위치 기반 추천 구체화
+                                    </h3>
+                                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                                        <button id="rec-gps-btn" style="padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid var(--primary-color); background: white; color: var(--primary-color); cursor: pointer; font-weight: 600; white-space: nowrap;">🛰️ 내 위치</button>
+                                        <input type="text" id="rec-address-input" placeholder="세부 위치 입력 (예: 강남역, 삼성동)" style="flex: 1; padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid #ddd; background: #fff !important; color: #333 !important;">
+                                        <button id="rec-search-btn" class="primary-btn" style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.95rem;">분석 실행</button>
+                                    </div>
+                                    <div id="rec-location-result" class="glass" style="margin-top: 1.25rem; padding: 1.25rem; display: none; background: rgba(255,255,255,0.8); border-radius: 12px; border-left: 5px solid var(--primary-color);">
+                                        <h4 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-main);">🔍 세부 위치 분석 결과</h4>
+                                        <p id="rec-location-desc" style="font-size: 0.95rem; color: var(--text-dim); line-height: 1.6; margin-bottom: 0.75rem;"></p>
+                                        <div id="rec-refined-tip" style="font-size: 1rem; font-weight: 700; color: var(--primary-color);"></div>
+                                    </div>
+                                </div>
+
+                                <div class="recommend-header glass" style="padding: 2rem; margin-bottom: 2rem;">
+                                    <h2 style="font-size: 1.75rem; color: var(--primary-color); margin-bottom: 0.5rem;">💡 <span id="recommend-district-name"></span> 지역 유망 업종 추천</h2>
+                                    <p class="sub-text">지역 상권 데이터를 분석하여 가장 성장 잠재력이 높은 업종을 선별했습니다.</p>
+                                </div>
+                                <div id="recommend-list" class="recommend-list" style="margin-bottom: 3rem;"></div>
+                                <div class="strategy-tips-box glass" style="border-left: 8px solid var(--accent-color); padding: 2rem; background: rgba(245, 158, 11, 0.03);">
+                                    <h3 style="color: var(--accent-color); margin-bottom: 1.5rem;">🎯 성공을 위한 지역 맞춤 전략 팁</h3>
+                                    <ul id="strategy-tips-list" style="list-style: none; padding: 0;"></ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab 3: Support -->
+                        <div id="tab-support" class="tab-content">
+                            <div class="support-section glass" style="padding: 2.5rem;">
+                                <div class="support-header" style="margin-bottom: 2rem;">
+                                    <h2 style="font-size: 1.75rem; color: var(--primary-color); display: flex; align-items: center; gap: 1rem;">
+                                        🤝 <span id="support-district-name"></span> 창업 지원 정보 안내
+                                        <span class="badge badge-pulse">실시간 정보</span>
+                                    </h2>
+                                    <p class="sub-text" style="margin-top: 0.5rem;">서울시 및 유관 기관에서 제공하는 맞춤형 지원 혜택입니다.</p>
+                                </div>
+                                <div id="support-list" class="support-list"></div>
+                            </div>
+                        </div>
+
+                        <!-- Tab 4: My Store -->
+                        <div id="tab-mystore" class="tab-content">
+                            <div class="mystore-wrapper">
+                                <div id="ms-input-screen" class="ms-screen active">
+                                    <div class="mystore-hero glass" style="padding: 2.5rem; text-align: center; margin-bottom: 2rem; background: var(--primary-gradient); color: white;">
+                                        <h2 style="font-size: 2rem; color: white !important; margin-bottom: 0.75rem;">🏠 내 가게 정밀 진단</h2>
+                                        <p style="font-size: 1.1rem; opacity: 0.9;">운영 중인 매장 정보를 입력하시면 AI가 상권 데이터와 비교 분석합니다.</p>
+                                    </div>
+                                    <div class="mystore-input-grid glass" style="padding: 2.5rem;">
+                                        <!-- NEW: 위치 기반 분석 보조 기능 -->
+                                        <div class="location-assist-box" style="margin-bottom: 2.5rem; padding-bottom: 2rem; border-bottom: 1px solid rgba(0,0,0,0.05);">
+                                            <label style="display: block; margin-bottom: 1rem; font-weight: 700; color: var(--text-dim);">📍 위치 기반 상권 자동 설정 (보조)</label>
+                                            <div style="display: flex; gap: 1rem; align-items: center;">
+                                                <button id="ms-gps-btn" class="secondary-btn" style="flex: 1; padding: 1rem; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #fff; border: 1px solid var(--primary-color); color: var(--primary-color); cursor: pointer; font-weight: 600; transition: all 0.2s;">
+                                                    <span>🛰️ 현재 위치(GPS) 사용</span>
+                                                </button>
+                                                <div style="flex: 1; position: relative;">
+                                                    <input type="text" id="ms-address-input" placeholder="주소를 입력하세요 (예: 강남구 역삼동)" style="width: 100%; padding: 1rem; border-radius: 12px; border: 1px solid #ddd; background: #fff !important; color: #333 !important;">
+                                                    <button id="ms-addr-search-btn" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.2rem;">🔍</button>
+                                                </div>
+                                            </div>
+                                            <p id="ms-location-status" style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--text-dim); min-height: 1.2rem;"></p>
+                                        </div>
+                                        <div class="input-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                                            <div class="input-item"><label>월 매출액 (만원)</label><input type="number" id="ms-sales" placeholder="예: 3000"></div>
+                                            <div class="input-item">
+                                                <label>임대 유형</label>
+                                                <select id="ms-rent-type"><option value="monthly">월세</option><option value="jeonse">전세</option><option value="owned">자가</option></select>
+                                            </div>
+                                            <div id="ms-monthly-input" class="input-item"><label>월세액 (만원)</label><input type="number" id="ms-rent" placeholder="예: 300"></div>
+                                            <div id="ms-jeonse-input" class="input-item" style="display: none;"><label>보증금 (만원)</label><input type="number" id="ms-deposit" placeholder="예: 50000"></div>
+                                            <div class="input-item"><label>일평균 방문객 (명)</label><input type="number" id="ms-visitors" placeholder="예: 50"></div>
+                                            <div class="input-item"><label>평균 객단가 (원)</label><input type="number" id="ms-price" placeholder="예: 15000"></div>
+                                        </div>
+                                        <div class="input-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+                                            <div class="input-item"><label>업종 카테고리</label><select id="ms-category"><option value="korean">한식</option><option value="western">양식</option><option value="cafe">카페</option><option value="pub">주점</option></select></div>
+                                            <div class="input-item"><label>영업 시간</label><select id="ms-hours"><option value="day">주간 중심</option><option value="night">야간 중심</option><option value="full">24시간</option></select></div>
+                                            <div class="input-item"><label>배달 운영 여부</label><select id="ms-delivery"><option value="yes">운영함</option><option value="no">운영안함</option></select></div>
+                                        </div>
+                                        <button id="ms-analyze-btn" class="primary-btn wide" style="margin-top: 3rem; padding: 1.5rem; font-size: 1.25rem;">내 가게 분석 실행</button>
+                                    </div>
+                                </div>
+
+                                <div id="ms-result-screen" class="ms-screen">
+                                    <div class="mystore-result-header glass" style="padding: 2.5rem; margin-bottom: 2rem;">
+                                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                            <div>
+                                                <h2 style="font-size: 1.75rem; color: var(--primary-color); margin-bottom: 0.5rem;">📈 분석 결과 리포트</h2>
+                                                <p class="sub-text">지역 평균 대비 내 매장의 현재 위치입니다.</p>
+                                            </div>
+                                            <div class="score-circle-box">
+                                                <div class="score-label">AI 종합 점수</div>
+                                                <div id="ms-res-score" class="score-val">0</div>
+                                            </div>
+                                        </div>
+                                        <div class="ms-progress-bg"><div id="ms-res-bar" class="ms-progress-fill" style="width: 0%"></div></div>
+                                    </div>
+
+                                    <!-- NEW: 전체 요약 및 핵심 문제 -->
+                                    <div class="ms-summary-banner glass highlight" style="padding: 1.5rem 2rem; margin-bottom: 2rem; background: var(--bg-color); border: 2px solid var(--primary-color);">
+                                         <p id="ms-res-total-summary" style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">요약 분석 중...</p>
+                                         <div id="ms-res-top-issue" style="display: inline-block; padding: 0.5rem 1rem; background: rgba(239, 68, 68, 0.1); color: #ef4444; border-radius: 8px; font-weight: 800; font-size: 0.95rem;">-</div>
+                                    </div>
+
+                                    <div class="ms-main-results-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                                        <div class="ms-card glass" style="padding: 2rem;">
+                                            <h3>🚩 운영 리스크 진단</h3>
+                                            <div id="ms-res-risk" class="ms-value-text" style="color: var(--accent-color);">-</div>
+                                        </div>
+                                        <div class="ms-card glass" style="padding: 2rem;">
+                                            <h3>⚖️ 지역 평균과 비교</h3>
+                                            <p id="ms-res-comparison" class="ms-desc">-</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="ms-card glass highlight" style="padding: 2.5rem; border-left: 8px solid var(--primary-color); margin-bottom: 2rem;">
+                                        <h3 style="color: var(--primary-color); margin-bottom: 1rem;">🚀 AI 솔루션 제언</h3>
+                                        <p id="ms-res-strategy" style="font-size: 1.15rem; line-height: 1.8; font-weight: 500;">-</p>
+                                    </div>
+
+                                    <!-- NEW: 분석 근거 & 개선 전략 -->
+                                    <div class="ms-detail-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                                        <div class="ms-card glass" style="padding: 2rem; border-top: 4px solid #94a3b8;">
+                                            <h3 style="font-size: 1.1rem; margin-bottom: 1.25rem;">📝 분석 근거</h3>
+                                            <ul id="ms-res-evidence-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.75rem;">
+                                                <!-- Dynamic items -->
+                                            </ul>
+                                        </div>
+                                        <div class="ms-card glass" style="padding: 2rem; border-top: 4px solid var(--accent-color);">
+                                            <h3 style="font-size: 1.1rem; margin-bottom: 1.25rem;">🎯 향후 개선 전략</h3>
+                                            <ul id="ms-res-strategy-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.75rem;">
+                                                <!-- Dynamic items -->
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    <div class="ms-evidence-section glass" style="padding: 2rem; background: rgba(0,0,0,0.02); margin-bottom: 2rem;">
+                                        <h4 style="margin-bottom: 1.5rem; color: var(--text-dim);">📍 주변 환경 분석 (입지 특성)</h4>
+                                        <div id="ms-res-env-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                            <!-- Dynamic items -->
+                                        </div>
+                                        <div id="ms-res-env-strategy-box" class="glass" style="margin-top: 1.5rem; padding: 1.25rem; background: rgba(14, 165, 233, 0.05); border-left: 4px solid var(--primary-color); display: none;">
+                                            <strong style="color: var(--primary-color); display: block; font-size: 0.9rem; margin-bottom: 0.5rem;">🎯 입지 기반 타겟팅 제언</strong>
+                                            <p id="ms-res-env-strategy" style="font-size: 0.95rem; font-weight: 600; color: var(--text-main); margin: 0;"></p>
+                                        </div>
+                                    </div>
+
+                                    <div class="ms-evidence-section glass" style="padding: 2rem; background: rgba(0,0,0,0.02);">
+                                        <h4 style="margin-bottom: 1.5rem; color: var(--text-dim);">📊 데이터 근거 (지역 평균)</h4>
+                                        <div class="ms-evidence-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                                            <div class="evidence-item"><span class="label">일평균 유동</span><span id="ms-ev-flow" class="val">-</span></div>
+                                            <div class="evidence-item"><span class="label">경쟁 점포수</span><span id="ms-ev-stores" class="val">-</span></div>
+                                            <div class="evidence-item"><span class="label">평균 임대료</span><span id="ms-ev-rent" class="val">-</span></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button id="ms-back-to-input" class="text-btn" style="margin-top: 2rem;">← 다시 분석하기</button>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
