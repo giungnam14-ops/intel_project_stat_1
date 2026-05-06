@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 상권 추천 대시보드</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Login Screen Overlay -->
+    <div id="login-screen" class="login-overlay">
+        <div class="login-container">
+            <div class="login-logo-wrapper">
+                <img src="{{ url_for('static', filename='images/sangchu.png') }}" alt="상추 로고" class="login-logo">
+            </div>
+            
+            <form id="login-form" class="login-form">
+                <div class="input-group">
+                    <input type="text" id="login-id" placeholder="아이디를 입력하세요" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="login-pw" placeholder="비밀번호를 입력하세요" required>
+                </div>
+                <button type="submit" class="btn-login">로그인</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <img src="{{ url_for('static', filename='images/sangchu.png') }}" alt="상추" class="sidebar-mascot">
+            <div class="brand-info">
+                <span class="brand-name">상권추천</span>
+                <span class="brand-sub">데이터 기반 창업의 시작</span>
+            </div>
+        </div>
+        
+        <nav class="sidebar-menu">
+            <a href="#" class="menu-item active" data-target="view-dashboard"><i class="icon-dashboard"></i> 대시보드</a>
+            <a href="#" class="menu-item" data-target="view-analysis"><i class="icon-search"></i> 상권 분석</a>
+            <a href="#" class="menu-item" data-target="view-recommend"><i class="icon-recommend"></i> 업종 추천</a>
+            <a href="#" class="menu-item" data-target="view-mystore"><i class="icon-store"></i> 내 가게 분석</a>
+            <a href="#" class="menu-item" data-target="view-support"><i class="icon-support"></i> 창업 지원</a>
+            <a href="#" class="menu-item" data-target="view-favorite"><i class="icon-favorite"></i> 즐겨찾기</a>
+        </nav>
+
+        <div class="sidebar-bottom-card">
+            <div class="tip-icon">💡</div>
+            <p>지도의 지역을 클릭하거나 상단 검색을 통해 분석 지역을 변경할 수 있어요!</p>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="dashboard-wrapper">
+        <header class="dashboard-header">
+            <div class="header-left">
+                <div class="location-selector">
+                    <h2 id="current-location-display">자치구를 선택해 주세요</h2>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <p class="header-date">실시간 AI 상권 분석 데이터</p>
+            </div>
+            <div class="header-right">
+                <button id="analyze-btn" class="header-btn">새로고침</button>
+                <button class="header-btn">공유하기</button>
+            </div>
+        </header>
+
+        <main class="dashboard-content">
+            <!-- Global Region Selector & Core Analysis (Always Visible) -->
+            <div class="dashboard-row top-row">
+                <!-- Map Card -->
+                <div class="card map-card">
+                    <div class="location-badge" id="display-selected-name">지역 선택 대기 중</div>
+                    <div id="mini-map-container" class="mini-map">
+                        <svg viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet" class="seoul-svg">
+                            <g id="districts-group"></g>
+                        </svg>
+                    </div>
+                    <div class="map-stats">
+                        <div class="map-stat-item">
+                            <label>유동인구 (월)</label>
+                            <div class="stat-value-group">
+                                <span class="stat-val" id="stat-floating">-</span>
+                                <span class="stat-trend">데이터 기반</span>
+                            </div>
+                        </div>
+                        <div class="map-stat-item">
+                            <label>평균 임대료</label>
+                            <div class="stat-value-group">
+                                <span class="stat-val" id="stat-rent">-</span>
+                                <span class="stat-trend">만원/㎡</span>
+                            </div>
+                        </div>
+                        <div class="map-stat-item">
+                            <label>지역 점포 수</label>
+                            <div class="stat-value-group">
+                                <span class="stat-val" id="stat-stores">-</span>
+                                <span class="stat-trend">외식업 기준</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Core Prediction Card -->
+                <div class="card core-card">
+                    <div class="card-header">
+                        <span class="badge">AI 분야별 정밀 분석</span>
+                        <div id="industry-selector" class="industry-badge-group">
+                            <!-- JS Dynamic Content -->
+                        </div>
+                    </div>
+                    <div class="core-content">
+                        <div class="core-text">
+                            <p class="focus-label" id="selected-industry-label">외식업 전체 평균</p>
+                            <h1 id="res-sales">-</h1>
+                            <div class="core-score">
+                                <span class="score-main" id="res-sales-range-min">-</span>
+                                <span class="score-total">~ 예상 범위</span>
+                            </div>
+                            <div class="core-tags">
+                                <span class="tag">✓ 지역 인기 업종 중심</span>
+                                <span class="tag">✓ 카테고리 가중치 적용</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-primary-full" onclick="document.querySelector('[data-target=view-analysis]').click()">리포트 상세보기 ↓</button>
+                </div>
+            </div>
+
+            <!-- View 1: Dashboard (Overview) -->
+            <div id="view-dashboard" class="content-view active">
+                <!-- TOP 5 removed as requested -->
+            </div>
+
+            <!-- View 2: Detailed Analysis -->
+            <div id="view-analysis" class="content-view">
+                <div class="section-header">
+                    <h3>상권 정밀 분석 리포트</h3>
+                </div>
+                <div class="dashboard-row">
+                    <div class="card report-card">
+                        <div class="chart-header">
+                            <h4>AI 전략 제언</h4>
+                            <span class="unit">GPT-4 Turbo</span>
+                        </div>
+                        <div id="res-report-content" class="report-content">지도를 클릭하여 분석을 시작하세요.</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-row bottom-row">
+                    <div class="card">
+                        <h4>매출 범위 분석</h4>
+                        <div class="chart-container-inner">
+                            <canvas id="revenueRangeChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h4>데이터 상관관계</h4>
+                        <div class="chart-container-inner">
+                            <canvas id="correlationChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h4>소셜 리뷰 감성</h4>
+                        <div class="sentiment-bar">
+                            <div id="nlp-pos-bar" class="sentiment-fill" style="width: 50%;"></div>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+                            <span>긍정 <span id="nlp-pos-val">-</span>%</span>
+                            <span>부정 <span id="nlp-neg-val">-</span>%</span>
+                        </div>
+                        <div id="nlp-keywords" class="keyword-tags" style="margin-top: 1rem;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View 3: Industry Recommendation -->
+            <div id="view-recommend" class="content-view">
+                <div class="section-header">
+                    <h3>데이터 기반 업종 추천</h3>
+                </div>
+                <div class="dashboard-row" style="grid-template-columns: 1.5fr 1fr;">
+                    <div class="card">
+                        <h4>상세 추천 리스트</h4>
+                        <div id="recommend-list" class="recommend-list-container">
+                            <!-- JS Dynamic Content -->
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h4>업종별 적합 지표</h4>
+                        <div class="chart-container-inner" style="height: 350px;">
+                            <canvas id="recommendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View 4: Startup Support -->
+            <div id="view-support" class="content-view">
+                <div class="section-header">
+                    <h3>창업 지원 프로그램</h3>
+                </div>
+                <div id="support-list" class="dashboard-row" style="grid-template-columns: repeat(3, 1fr);">
+                    <!-- JS Dynamic Content -->
+                </div>
+            </div>
+
+            <!-- View 4.5: My Store Analysis -->
+            <div id="view-mystore" class="content-view">
+                <div class="section-header">
+                    <h3>내 가게 분석 (My Store Analysis)</h3>
+                </div>
+                <div class="dashboard-row" style="grid-template-columns: 1fr 2fr;">
+                    <div class="card">
+                        <h4 style="margin-bottom: 1.5rem;">내 가게 정보 입력</h4>
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <div>
+                                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">분석 지역</label>
+                                <select id="mystore-district" class="mystore-input" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color);"></select>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">업종 (외식업)</label>
+                                <select id="mystore-industry" class="mystore-input" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <option value="korean">한식음식점</option>
+                                    <option value="cafe">커피-음료</option>
+                                    <option value="chicken">치킨전문점</option>
+                                    <option value="bakery">제과점</option>
+                                    <option value="fastfood">패스트푸드점</option>
+                                    <option value="bunsik">분식전문점</option>
+                                    <option value="japanese">일식음식점</option>
+                                    <option value="chinese">중식음식점</option>
+                                    <option value="western">양식음식점</option>
+                                    <option value="pub">호프-간이주점</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">월 매출 (만원)</label>
+                                <input type="number" id="mystore-sales" class="mystore-input" placeholder="예: 3000" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">월 임대료 (만원)</label>
+                                <input type="number" id="mystore-rent" class="mystore-input" placeholder="예: 200" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                            </div>
+                            <button id="btn-analyze-mystore" class="btn-primary-full" style="margin-top: 1rem;">지역 평균과 비교 분석하기</button>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="display: flex; flex-direction: column;">
+                        <h4 style="margin-bottom: 1.5rem;">진단 리포트</h4>
+                        <div id="mystore-result-empty" style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
+                            <p>좌측에 가게 정보를 입력하고 분석 버튼을 눌러주세요.</p>
+                        </div>
+                        <div id="mystore-result-content" class="hidden" style="flex: 1; display: flex; flex-direction: column; gap: 1.5rem;">
+                            <!-- AI Diagnosis -->
+                            <div id="mystore-diagnosis-box" style="padding: 1.2rem; background: rgba(52, 152, 219, 0.1); border-left: 4px solid var(--primary-color); border-radius: 0 8px 8px 0;">
+                                <div style="font-weight: 800; color: var(--primary-color); margin-bottom: 0.5rem;">AI 수익성 진단</div>
+                                <p id="mystore-diagnosis-text" style="font-size: 0.95rem; line-height: 1.5;">-</p>
+                            </div>
+                            
+                            <!-- Charts -->
+                            <div class="dashboard-row" style="grid-template-columns: 1fr 1fr; margin-bottom: 0; flex: 1;">
+                                <div style="position: relative; height: 240px; width: 100%;">
+                                    <h5 style="text-align: center; font-size: 0.85rem; color: var(--text-muted);">월 매출 비교</h5>
+                                    <canvas id="mystoreSalesChart"></canvas>
+                                </div>
+                                <div style="position: relative; height: 240px; width: 100%;">
+                                    <h5 style="text-align: center; font-size: 0.85rem; color: var(--text-muted);">월 임대료 비교</h5>
+                                    <canvas id="mystoreRentChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View 5: Favorites (Search History) -->
+            <div id="view-favorite" class="content-view">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>최근 검색 및 즐겨찾기</h3>
+                    <button id="btn-clear-history" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem; border-radius: 8px;">기록 전체 삭제</button>
+                </div>
+                <div id="history-list" class="dashboard-row" style="grid-template-columns: repeat(2, 1fr);">
+                    <!-- JS Dynamic Content (History Cards) -->
+                    <div class="card" style="text-align: center; padding: 3rem; grid-column: 1 / -1;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">⭐</div>
+                        <p>아직 검색 및 분석 기록이 없습니다.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Region Selector Modal -->
+    <div id="region-selector-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>분석 지역 변경</h2>
+            <select id="district-select-modal"></select>
+            <button id="modal-analyze-btn" class="btn-primary-full">분석 시작</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
